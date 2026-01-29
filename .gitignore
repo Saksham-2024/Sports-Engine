@@ -1,0 +1,10 @@
+dataset/ 
+failed_YOLO_finetuning/ 
+Research Papers/ 
+venv/
+__pychache__/
+*.pyc
+match1_(for_shuttle_trajectory_and_shot_classification).mp4
+Signed-synopsis.pdf
+NaiveApproach/Skeleton_marked_frames/
+NaiveApproach/KeyFrames/
