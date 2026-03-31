@@ -11,3 +11,5 @@ NaiveApproach/KeyFrames/
 *.csv
 *.pt
 *.npz
+*.pdf
+dataset_expansion/unlabeled_videos/

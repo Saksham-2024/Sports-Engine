@@ -2,15 +2,12 @@ import torch
 import torch.nn as nn
 import numpy as np
 from torch.utils.data import DataLoader, TensorDataset, random_split
-from sklearn.preprocessing import StandardScaler
-from sklearn.utils.class_weight import compute_class_weight
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.preprocessing import StandardScaler #type: ignore
+from sklearn.utils.class_weight import compute_class_weight #type: ignore
+import matplotlib.pyplot as plt #type: ignore
+import seaborn as sns #type: ignore
+from sklearn.metrics import confusion_matrix, classification_report #type: ignore
 
-# ==========================================
-# 1. LOAD & SCALE THE DATA
-# ==========================================
 print("Loading 3D Tensor...")
 data = np.load('5.2-features_tensor_doubled.npz', allow_pickle=True)
 X_raw = data['X']

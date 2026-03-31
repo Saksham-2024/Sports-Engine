@@ -43,6 +43,17 @@
 
 
 
+
+# Refined Data Pipeline StructureScript 1: The "Auto-Labeler" (Hit Detector)Input: Video + MediaPipe CSV.Output: Updated CSV with a hit_frame column (1/0).Value: 
+# This creates the "Temporal Anchors" for your physics. You now know exactly when the $Z$ coordinate is at its peak (Smash) or at the floor.
+# Script 2: The "Vision Pass" (TrackNetV3)Input: Video.Output: Shuttle image_x, image_y for every frame.Value: This provides the "Observed Path." 
+# Even if it’s noisy, it’s better than pure simulation.Script 3: The "Spatial Resolver" (SolvePnP + Correction)Task A: Run solvePnP once per video to get the Camera 
+# Matrix.Task B: Use the "Similar Triangles" formula with the Camera $Z$ from SolvePnP to project the TrackNet pixels onto the court.
+# Task C: Calculate the final $Z$ using the time-of-flight between the hit_frame markers from Script 1.
+
+
+
+
 import numpy as np
 import pandas as pd
 
