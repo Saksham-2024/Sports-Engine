@@ -64,7 +64,15 @@ class OptimusPrimeContainer(object):
         self.model = OptimusPrime(
             num_tokens=4, dim_model=2048, num_heads=8, num_encoder_layers=8, dim_feedforward=2048, dropout_p=0
         ).to(self.device)
-        self.model.load_state_dict(torch.load(self.args['opt_path']))
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        checkpoint = torch.load(self.args['opt_path'], map_location=device)
+        # Extract only the weights and load them
+        if 'model_state_dict' in checkpoint:
+            self.model.load_state_dict(checkpoint['model_state_dict'])
+            print("✅ Successfully loaded weights from checkpoint['model_state_dict']")
+        else:
+            self.model.load_state_dict(checkpoint)
+            print("✅ Successfully loaded weights from flat state_dict")
         self.model.eval()
     
     def __setup_scaler(self):

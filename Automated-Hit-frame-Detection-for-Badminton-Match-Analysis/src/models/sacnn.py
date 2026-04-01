@@ -41,7 +41,8 @@ class SACNNContainer(object):
 
     def setup_model(self):
         self.model = SACNN().to(self.device)
-        self.model.load_state_dict(torch.load(self.args['sacnn_path']))
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.model.load_state_dict(torch.load(self.args['sacnn_path'], map_location=self.device))
         self.model.eval()
 
     def predict(self, batch, processed=False):

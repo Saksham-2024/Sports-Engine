@@ -1,3 +1,4 @@
+import copy
 import torch
 import torchvision
 import numpy as np
@@ -6,9 +7,9 @@ import cv2
 from PIL import Image
 from torchvision.transforms import transforms
 from torchvision.transforms import functional as F
+from torchvision.models.detection import keypointrcnn_resnet50_fpn
 from models.transformer import OptimusPrimeContainer
-
-
+import cv2
 
 class RallyProcessor(object):
     '''
@@ -30,9 +31,9 @@ class RallyProcessor(object):
         self.rally_info = None
 
     def __setup_RCNN(self):
-        self.__court_kpRCNN = torch.load(self.args['court_kpRCNN_path'])
-        self.__court_kpRCNN.to(self.device).eval()
-        self.__kpRCNN = torch.load(self.args['kpRCNN_path'])
+        self.__kpRCNN = keypointrcnn_resnet50_fpn(pretrained=False, num_keypoints=17)
+        state_dict = torch.load(self.args['kpRCNN_path'], map_location=self.device)
+        self.__kpRCNN.load_state_dict(state_dict)
         self.__kpRCNN.to(self.device).eval()
     
     def __setup_opt(self):
@@ -45,47 +46,51 @@ class RallyProcessor(object):
         self.start_end_frame_list = []
 
     def get_court_info(self, img, frame_height):
-        img = F.to_tensor(img)
-        img = img.unsqueeze(0)
-        img = img.to(self.device)
-        output = self.__court_kpRCNN(img)
-        scores = output[0]['scores'].detach().cpu().numpy()
-        high_scores_idxs = np.where(scores > 0.7)[0].tolist()
-        post_nms_idxs = torchvision.ops.nms(output[0]['boxes'][high_scores_idxs],
-                                            output[0]['scores'][high_scores_idxs], 0.3).cpu().numpy()
-        keypoints = []
-        for kps in output[0]['keypoints'][high_scores_idxs][post_nms_idxs].detach().cpu().numpy():
-            keypoints.append([list(map(int, kp[:2])) for kp in kps])
+            self.__true_court_points = []
 
-        self.__true_court_points = copy.deepcopy(keypoints[0])
+            def click_event(event, x, y, flags, params):
+                if event == cv2.EVENT_LBUTTONDOWN:
+                    self.__true_court_points.append([int(x), int(y)])
+                    cv2.circle(img_display, (x, y), 5, (0, 255, 0), -1)
+                    cv2.putText(img_display, str(len(self.__true_court_points)-1), 
+                                (x+10, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                    cv2.imshow("CLICK 6 POINTS: TL, TR, ML, MR, BL, BR", img_display)
 
-        '''
-        l -> left, r -> right, y = a * x + b
-        '''
-        l_a = (self.__true_court_points[0][1] - self.__true_court_points[4][1]) / (self.__true_court_points[0][0] - self.__true_court_points[4][0])
-        l_b = self.__true_court_points[0][1] - l_a * self.__true_court_points[0][0]
-        r_a = (self.__true_court_points[1][1] - self.__true_court_points[5][1]) / (self.__true_court_points[1][0] - self.__true_court_points[5][0])
-        r_b = self.__true_court_points[1][1] - r_a * self.__true_court_points[1][0]
-        mp_y = (self.__true_court_points[2][1] + self.__true_court_points[3][1]) / 2
+            img_display = img.copy()
+            cv2.imshow("CLICK 6 POINTS: TL, TR, ML, MR, BL, BR", img_display)
+            cv2.setMouseCallback("CLICK 6 POINTS: TL, TR, ML, MR, BL, BR", click_event)
 
-        self.__court_info = [l_a, l_b, r_a, r_b, mp_y]
+            while len(self.__true_court_points) < 6:
+                cv2.waitKey(1)
+            
+            cv2.destroyWindow("CLICK 6 POINTS: TL, TR, ML, MR, BL, BR")
 
-        self.__multi_points = self.__partition(self.__correction()).tolist()
+            # --- Geometry Calculations ---
+            l_a = (self.__true_court_points[0][1] - self.__true_court_points[4][1]) / (self.__true_court_points[0][0] - self.__true_court_points[4][0])
+            l_b = self.__true_court_points[0][1] - l_a * self.__true_court_points[0][0]
+            r_a = (self.__true_court_points[1][1] - self.__true_court_points[5][1]) / (self.__true_court_points[1][0] - self.__true_court_points[5][0])
+            r_b = self.__true_court_points[1][1] - r_a * self.__true_court_points[1][0]
+            mp_y = (self.__true_court_points[2][1] + self.__true_court_points[3][1]) / 2
 
-        keypoints[0][0][0] -= 80
-        keypoints[0][0][1] -= 80
-        keypoints[0][1][0] += 80
-        keypoints[0][1][1] -= 80
-        keypoints[0][2][0] -= 80
-        keypoints[0][3][0] += 80
-        keypoints[0][4][0] -= 80
-        keypoints[0][4][1] = min(keypoints[0][4][1] + 80, frame_height - 40)
-        keypoints[0][5][0] += 80
-        keypoints[0][5][1] = min(keypoints[0][5][1] + 80, frame_height - 40)
+            self.__court_info = [l_a, l_b, r_a, r_b, mp_y]
+            self.__multi_points = self.__partition(self.__correction()).tolist()
 
-        self.__extended_court_points = keypoints[0]
+            keypoints = [copy.deepcopy(self.__true_court_points)]
 
-        self.got_info = True
+            # Apply 80-pixel padding for "Extended Court" logic
+            keypoints[0][0][0] -= 80
+            keypoints[0][0][1] -= 80
+            keypoints[0][1][0] += 80
+            keypoints[0][1][1] -= 80
+            keypoints[0][2][0] -= 80
+            keypoints[0][3][0] += 80
+            keypoints[0][4][0] -= 80
+            keypoints[0][4][1] = min(keypoints[0][4][1] + 80, frame_height - 40)
+            keypoints[0][5][0] += 80
+            keypoints[0][5][1] = min(keypoints[0][5][1] + 80, frame_height - 40)
+
+            self.__extended_court_points = keypoints[0]
+            self.got_info = True
 
     def add_frame(self, frame, frame_num):
         outputs = self.__human_detection(frame)

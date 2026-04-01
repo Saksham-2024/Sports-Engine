@@ -72,6 +72,7 @@ class VideoResolver(object):
             self.video_name = path.split('/')[-1].split('.mp4')[0]
             resolved = self.__build_saving_directories()
             if not resolved:
+                print(f"\n🚀 Processing: {self.video_name}")
                 self.__setup()
                 self.__resolve(path)
             else:
