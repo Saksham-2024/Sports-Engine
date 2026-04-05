@@ -1,23 +1,25 @@
 import subprocess
 import os
-import threading
 import sys
 import time
+import threading
 
+CONDA_PYTHON = "/home/saksham/miniconda3/envs/hit_detector_env/bin/python"
 REPO_PATH = "/home/saksham/projects and programming/BTech_Project/Automated-Hit-frame-Detection-for-Badminton-Match-Analysis"
 CONFIG_PATH = os.path.join(REPO_PATH, "configs", "ai_coach.yaml")
-MAIN_PATH = os.path.join(REPO_PATH, "src")
-PWD = os.path.abspath("../dataset_expansion")
-OUTPUT_PATH = os.path.join(PWD, "output")
-RALLY_PATH = os.path.join(OUTPUT_PATH, "rallies")
-JOINT_PATH = os.path.join(OUTPUT_PATH, "joints")
-VIDEO_DIR = os.path.join(PWD, 'unlabeled_videos')
+
+CWD = os.path.abspath("../dataset_expansion")
+VIDEO_DIR = os.path.join(CWD, 'unlabeled_videos')
+JOINT_PATH = os.path.join(CWD, 'output/joints')
+RALLY_PATH = os.path.join(CWD, 'output/rallies')
+VIDEO_SAVE_PATH = os.path.join(CWD, 'output/videos')
 
 stop_event = threading.Event()
 
 def get_progress():
     total_videos = len([f for f in os.listdir(VIDEO_DIR) 
                         if f.lower().endswith(('.mp4', '.avi', '.mov'))])
+    
     
     if not os.path.exists(RALLY_PATH):
         processed_count = 0
@@ -41,14 +43,15 @@ def print_status_bar():
 def run_batch_inference():
     """Executes the prediction script once to process the whole folder."""
     command = [
-            "python3", "main.py",
+            CONDA_PYTHON, 
+            "src/main.py", 
             "--yaml_path", CONFIG_PATH
         ]
     try:
         print(f"[RUNNING] Starting Batch Inference for all videos...")
         subprocess.run(
             command, 
-            cwd=MAIN_PATH,       
+            cwd=REPO_PATH,       
             check=True, 
             text=True
         )
@@ -59,7 +62,7 @@ def run_batch_inference():
         stop_event.set()
 
 if __name__ == "__main__":
-    for p in [JOINT_PATH, RALLY_PATH]:
+    for p in [JOINT_PATH, RALLY_PATH, VIDEO_SAVE_PATH]:
         os.makedirs(p, exist_ok=True)
 
     ml_thread = threading.Thread(target=run_batch_inference)

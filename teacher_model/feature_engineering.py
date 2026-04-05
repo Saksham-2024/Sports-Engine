@@ -1,10 +1,22 @@
+import os
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
 
 df = pd.read_csv('3-interpolated_dataset(raw).csv')
-grouped = df.groupby(['match_no', 'playing_side'])
+output_csv = '4.1-engineered_dataset.csv'
 epsilon = 1e-8
+
+completed_strokes = set()
+if os.path.exists(output_csv):
+    try:
+        existing_df = pd.read_csv(output_csv, usecols=['match_no', 'playing_side', 'point_no', 'stroke_num'])
+        completed_subset = existing_df.drop_duplicates()
+        completed_strokes = set(tuple(x) for x in completed_subset.to_numpy())
+        print(f"Resuming... Found {len(completed_strokes)} completely processed strokes in CSV.")
+    except Exception as e:
+        print(f"Starting fresh. Could not read output CSV: {e}")
+
 data = []
 
 def vector(x1, y1, z1, x2, y2, z2):
@@ -22,6 +34,7 @@ def angle_xy(vec1, vec2):
 
 def angle_yz(vec1, vec2):
     v1, v2 = np.copy(vec1), np.copy(vec2)
+    v1[0], v2[0] = 0, 0
     dot = np.dot(v1, v2)
     mag1, mag2 = np.linalg.norm(v1), np.linalg.norm(v2)
     cos = np.clip(dot / (mag1 * mag2 + epsilon), -1.0, 1.0)
@@ -31,6 +44,7 @@ def angle_yz(vec1, vec2):
 
 def angle_xz(vec1, vec2):
     v1, v2 = np.copy(vec1), np.copy(vec2)
+    v1[1], v2[1] = 0, 0
     dot = np.dot(v1, v2)
     mag1, mag2 = np.linalg.norm(v1), np.linalg.norm(v2)
     cos = np.clip(dot / (mag1 * mag2 + epsilon), -1.0, 1.0)
@@ -50,6 +64,7 @@ def dist(x1, y1, z1, x2, y2, z2):
     return ((x2 - x1) ** 2 + (y2 - y1) ** 2 + (z2 - z1) ** 2) ** 0.5
 
 handedness_map = {}
+grouped = df.groupby(['match_no', 'playing_side'])
 def hand():
     for (match, player), group in grouped:
         var_wrist_left = 0
@@ -65,7 +80,6 @@ def hand():
         handedness_map[(match, player)] = 'right' if var_wrist_right > var_wrist_left else 'left'
 
 hand()
-
 joints = {
     'shoulder': [11, 12],
     'elbow': [13, 14],
@@ -77,8 +91,15 @@ joints = {
 
 grouped = df.groupby(['match_no', 'playing_side', 'point_no', 'stroke_num'])
 for (match, side, pt, strk), group in grouped:
+    if (match, side, pt, strk) in completed_strokes:
+        continue
+    stroke_type = group.iloc[0]['stroke_type']
+    if stroke_type == 'FAULT':
+        continue
+
     prev_coords = None
     prev_angles = None
+    stroke_data = []
     for i in range(len(group)):
         row = group.iloc[i]
         coords = {}
@@ -236,7 +257,8 @@ for (match, side, pt, strk), group in grouped:
 
         frame_features = {
             'match_no': match, 'playing_side': side, 
-            'point_no': pt, 'stroke_num': strk, 'frame_no': row['frame_no'], 'stroke_type': row['stroke_type']
+            'point_no': pt, 'stroke_num': strk, 'frame_no': row['frame_no'], 'stroke_type': row['stroke_type'],
+            'court_x': row['court_x'], 'court_y': row['court_y']
         }
         arm = handedness_map[(match, side)]
         other_arm = 'left' if arm == 'right' else 'right'
@@ -258,25 +280,29 @@ for (match, side, pt, strk), group in grouped:
         apply_symmetry(velocities)
         apply_symmetry(dists)
         
-        data.append(frame_features)
+        stroke_data.append(frame_features)
+    
+    stroke_df = pd.DataFrame(stroke_data)
+    stroke_df['stroke_type'] = stroke_df['stroke_type'].replace('Flick-Serve', 'Serve')
+
+    cols_to_exclude = ['match_no', 'playing_side', 'point_no', 'stroke_num', 'frame_no', 'stroke_type']
+    feature_columns = [col for col in stroke_df.columns if col not in cols_to_exclude]
+    stroke_df[feature_columns] = stroke_df[feature_columns].interpolate(method='linear', limit_direction='both')
+
+    write_header = not os.path.exists(output_csv)
+    stroke_df.to_csv(output_csv, mode='a', header=write_header, index=False)
+    
+    completed_strokes.add((match, side, pt, strk))
     
 
 print("Math complete. Converting to DataFrame...")
-final_df = pd.DataFrame(data)
-
-# Interpolate the NaNs injected at Frame 0
-# We group by stroke so it doesn't accidentally pull velocity from a different stroke
+final_df = pd.read_csv(output_csv)
 cols_to_exclude = ['match_no', 'playing_side', 'point_no', 'stroke_num', 'frame_no', 'stroke_type']
 feature_columns = [col for col in final_df.columns if col not in cols_to_exclude]
 
-final_df[feature_columns] = final_df.groupby(['match_no', 'playing_side', 'point_no', 'stroke_num'])[feature_columns].transform(
-    lambda x: x.interpolate(method='linear', limit_direction='both')
-)
-final_df = final_df[final_df['stroke_type'] != 'FAULT']
-final_df['stroke_type'] = final_df['stroke_type'].replace('Flick-Serve', 'Serve')
-
 X_raw = final_df[feature_columns].to_numpy()
 
+assert len(final_df) % 30 == 0, f"Dataset has {len(final_df)} rows — not divisible by 30. Some strokes are malformed."
 num_strokes = len(final_df) // 30
 num_features = len(feature_columns)
 X_tensor = X_raw.reshape(num_strokes, 30, num_features)
@@ -287,9 +313,6 @@ y_tensor = encoder.fit_transform(y_strings)
 
 np.savez_compressed('4.2-features_tensor.npz', X=X_tensor, y=y_tensor, feature_names=feature_columns, classes=encoder.classes_)
 print(f"SUCCESS! Tensor shape: {X_tensor.shape}, y_tensor shape: {y_tensor.shape}")
-
-final_df.to_csv('4.1-engineered_dataset.csv', index=False)
-
 
 
         

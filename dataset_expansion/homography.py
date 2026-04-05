@@ -2,9 +2,12 @@ import cv2
 import numpy as np
 import pickle
 import os
+import json
 
-video_dir = './unlabeled_videos'
-videos = [f for f in os.listdir(video_dir)]
+VIDEO_DIR = './unlabeled_videos'
+OUTPUT_DIR = './output'
+RALLY_PATH = os.path.join(OUTPUT_DIR, 'rallies')
+videos = [f for f in os.listdir(VIDEO_DIR)]
 
 def homography(time, video_path):
     cap = cv2.VideoCapture(video_path)
@@ -64,8 +67,12 @@ def gather_matrices():
     matrices = {}
     for video in videos:
         H = np.zeros((3,3), dtype=np.float64)
-        video_path = video_dir + video
-        start_frame = 7500
+        video_path = VIDEO_DIR + video
+        with open(os.path.join(RALLY_PATH, video.split('.')[0], '.json'), 'r') as f:
+            metadata = json.load(f)
+        
+        rallies = metadata['rally']
+        start_frame = rallies[0][0] if rallies else 7500
         # get the stroke that has normal camera angle to calculate homography
         i = 30
         while i > 0:

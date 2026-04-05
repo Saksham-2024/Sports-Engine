@@ -54,12 +54,3 @@
 
 
 
-import numpy as np
-import pandas as pd
-
-df = pd.read_csv('1-timestamps.csv')
-grouped = df.groupby(['match_no', 'playing_side'])
-for (match, side_val), group in grouped:
-    if side_val == 1:
-        print(match, side_val)
-        print(group)

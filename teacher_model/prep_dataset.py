@@ -18,6 +18,13 @@ grouped = df.groupby(['match_no'])
 output_csv = '2-pose_dataset(raw).csv'
 # avg shot duration - 30 frames
 
+# Targeting Config_____________________________________________________________________________
+
+TARGETED_MATCHES = {19, 20, 21}           # ← set your 2-3 match numbers here
+TARGET_STROKES   = {'Drive', 'Net-Kill', 'Clear', 'Dropshot'}   # ← stroke types to extract from those matches
+
+# _____________________________________________________________________________________________
+
 completed_strokes = set()
 if os.path.exists(output_csv):
     try:
@@ -63,6 +70,12 @@ def homography(time, video_path):
         if not ret:
             print(f"Error reading frame {time} from video {video_path} for homography setup")
             return False, np.zeros((3, 3), dtype=np.float64)
+
+        screen_w, screen_h = 1280, 720
+        h, w = frame.shape[:2]
+        scale = min(screen_w / w, screen_h / h)
+        display_w, display_h = int(w * scale), int(h * scale)
+        display_frame = cv2.resize(frame, (display_w, display_h))
         
         points = []
 
@@ -72,10 +85,10 @@ def homography(time, video_path):
         def click_event(event, x, y, flags, param):
             if event == cv2.EVENT_LBUTTONDOWN:
                 points.append((x, y))
-                cv2.circle(frame, (x, y), 5, (0, 0, 255), -1)
-                cv2.imshow('Mark 4 Court Corners', frame)
+                cv2.circle(display_frame, (x, y), 5, (0, 0, 255), -1)
+                cv2.imshow('Mark 4 Court Corners', display_frame)
 
-        cv2.imshow('Mark 4 Court Corners', frame)
+        cv2.imshow('Mark 4 Court Corners', display_frame)
         cv2.setMouseCallback('Mark 4 Court Corners', click_event)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
@@ -104,14 +117,21 @@ def homography(time, video_path):
         print(f"Error during homography setup for match: {e}")
         return False, np.zeros((3, 3), dtype=np.float64)
 
+homography_cache_file = 'homography_cache.pkl'
+matrices = {}
 
-def gather_matrices():
-    matrices = {}
-    for match, group in grouped:
-        H = np.zeros((3,3), dtype=np.float64)
-        video_path = video_dir + f'/match{match[0]}.mp4'
+if os.path.exists(homography_cache_file):
+    with open(homography_cache_file, 'rb') as f:
+        matrices = pickle.load(f)
+        print(f"Loaded {len(matrices)} homography matrices from cache.")
 
-        # get the stroke that has normal camera angle to calculate homography
+cache_updated = False
+
+for match, group in grouped:
+    video_path = video_dir + f'/match{match[0]}.mp4'
+    if video_path not in matrices:
+        print(f"\n New match detected: {match[0]}. Opening camera view for calibration...")
+        
         i = 0
         while i < len(group):
             if group.iloc[i]['camera'] != 'normal':
@@ -119,32 +139,41 @@ def gather_matrices():
             else:
                 start_frame = int(group.iloc[i]['stroke_begin'])
                 ret, H = homography(start_frame, video_path)
+                
                 if ret:
                     matrices[video_path] = H
+                    cache_updated = True
                     break
                 else:
-                    print(f'error calculating homography for match {match[0]}, mark 4 corners again')
+                    print(f'Error calculating homography for match {match[0]}, moving to next normal frame.')
                     i += 1
-            
-    return matrices
 
-
-homography_cache_file = 'homography_cache.pkl'
-if os.path.exists(homography_cache_file):
-    with open(homography_cache_file, 'rb') as f:
-        matrices = pickle.load(f)
-        print("Loaded homography matrices from cache! No clicking needed.")
-else:
-    matrices = gather_matrices()
+if cache_updated:
     with open(homography_cache_file, 'wb') as f:
         pickle.dump(matrices, f)
-    print("Homography matrices calculated and cached.")
+    print("\n✅ Homography cache updated and saved with new matches.")
+else:
+    print("\n✅ All matches in the CSV are already calibrated. Proceeding to extraction...")
 
 
 for match, group in grouped:
+    match_no = match[0]
     video_path = video_dir + f'/match{match[0]}.mp4'
     if video_path not in matrices:
         continue
+
+    # ── Targeted match: print what will be skipped, then filter group ─────────
+    is_targeted = match_no in TARGETED_MATCHES
+    if is_targeted:
+        full_count     = len(group)
+        filtered_group = group[group['stroke_type'].isin(TARGET_STROKES)]
+        skip_count     = full_count - len(filtered_group)
+        print(f"\nMatch {match_no} is TARGETED — extracting only {TARGET_STROKES}.")
+        print(f"  {len(filtered_group)} qualifying strokes | {skip_count} strokes skipped.")
+        group = filtered_group
+        if len(group) == 0:
+            print(f"  No qualifying strokes found in match {match_no}, skipping entirely.")
+            continue
     
     H = matrices[video_path]
     cap = cv2.VideoCapture(video_path)
@@ -186,29 +215,40 @@ for match, group in grouped:
         missing_frames = 0
         stroke_data = []
         last_valid_box = None
-        for frame_no in range(stroke_begin, stroke_end):
+        start_frame = int(stroke_begin)
+        cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+        current_frame = cap.get(cv2.CAP_PROP_POS_FRAMES)
+        while current_frame < start_frame:
+            ret, _ = cap.read()
+            if not ret:
+                break
+            current_frame += 1
+        frame_no = current_frame
 
-            def handle_missing_frame():
-                flattened_landmarks = {
-                    "match_no": match[0],
-                    "point_no": group.iloc[i]['point_no'],
-                    "stroke_num": group.iloc[i]['stroke_num'],
-                    "frame_no": frame_no,
-                    "stroke_type": stroke_type,
-                    "playing_side": playing_side
-                }
-                for j in range(11,33):
-                    flattened_landmarks[f'x{j}'] = np.nan
-                    flattened_landmarks[f'y{j}'] = np.nan
-                    flattened_landmarks[f'z{j}'] = np.nan
-                    flattened_landmarks[f'v{j}'] = np.nan
-                stroke_data.append(flattened_landmarks)
+        def handle_missing_frame(frame_no):
+            flattened_landmarks = {
+                "match_no": match[0],
+                "point_no": group.iloc[i]['point_no'],
+                "stroke_num": group.iloc[i]['stroke_num'],
+                "frame_no": frame_no,
+                "stroke_type": stroke_type,
+                "playing_side": playing_side,
+                "court_x": np.nan,
+                "court_y": np.nan
+            }
+            for j in range(11,33):
+                flattened_landmarks[f'x{j}'] = np.nan
+                flattened_landmarks[f'y{j}'] = np.nan
+                flattened_landmarks[f'z{j}'] = np.nan
+                flattened_landmarks[f'v{j}'] = np.nan
+            stroke_data.append(flattened_landmarks)
 
-            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_no)
+        while frame_no < stroke_end:    
             ret, img = cap.read()
             if not ret:
-                handle_missing_frame()
+                handle_missing_frame(frame_no)
                 missing_frames += 1
+                frame_no += 1
                 continue
 
             results = model.predict(img, verbose = False)
@@ -230,18 +270,22 @@ for match, group in grouped:
             if len(players_pos) < 2:
                 if (len(players_pos) == 1 and ((playing_side == 1 and players_pos[0][1] >= 6.7) or (playing_side == 2 and players_pos[0][1] <= 6.7))) or len(players_pos) == 0:
                     missing_frames += 1
-                    handle_missing_frame()
+                    handle_missing_frame(frame_no)
+                    frame_no += 1
                     continue
                     
                 else:
                     x_start, y_start, x_end, y_end = players_pos[0][2], players_pos[0][3], players_pos[0][4], players_pos[0][5]
+                    selected_court_x, selected_court_y = players_pos[0][0], players_pos[0][1]
 
             else:    
                 players_pos.sort(key=lambda p: p[1])
                 if group.iloc[i]['playing_side'] == 1:
                     x_start, y_start, x_end, y_end = players_pos[0][2], players_pos[0][3], players_pos[0][4], players_pos[0][5]
+                    selected_court_x, selected_court_y = players_pos[0][0], players_pos[0][1]   
                 else:
-                    x_start, y_start, x_end, y_end = players_pos[1][2], players_pos[1][3], players_pos[1][4], players_pos[1][5]     
+                    x_start, y_start, x_end, y_end = players_pos[1][2], players_pos[1][3], players_pos[1][4], players_pos[1][5]   
+                    selected_court_x, selected_court_y = players_pos[1][0], players_pos[1][1]  
             
             if y_end > y_start and x_end > x_start:
                 last_valid_box = (x_start, y_start, x_end, y_end)
@@ -263,7 +307,9 @@ for match, group in grouped:
                     "stroke_num": group.iloc[i]['stroke_num'],
                     "frame_no": frame_no,
                     "stroke_type": stroke_type,
-                    "playing_side": playing_side
+                    "playing_side": playing_side,
+                    "court_x": selected_court_x,
+                    "court_y": (6.7 - selected_court_y) if playing_side == 1 else (selected_court_y - 6.7)
                 }
                 
                 invisible_landmarks = 0
@@ -289,9 +335,10 @@ for match, group in grouped:
 
             else:
                 missing_frames += 1
-                handle_missing_frame()
+                handle_missing_frame(frame_no)
             
             print(f'processed frame_no {frame_no}')
+            frame_no += 1
             
         if len(stroke_data) == 30 and missing_frames <= 6:
             stroke_df = pd.DataFrame(stroke_data)

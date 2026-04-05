@@ -2,12 +2,11 @@ import yt_dlp #type: ignore
 import os
 
 video_links = [
-    "https://www.youtube.com/watch?v=qvBL6GVZR4c&list=PLA7ZcagI0frCRsdX5bIGfKU2c1xldBImV&index=3",
-    "https://www.youtube.com/watch?v=3BAg0Za8yCE&list=PLA7ZcagI0frCRsdX5bIGfKU2c1xldBImV&index=9",
-    "https://www.youtube.com/watch?v=tgHjFhBHWfE&list=PLA7ZcagI0frCRsdX5bIGfKU2c1xldBImV&index=15",
-    "https://www.youtube.com/watch?v=L-J5Dz6TmIE&list=PLA7ZcagI0frCRsdX5bIGfKU2c1xldBImV&index=17",
-    "https://www.youtube.com/watch?v=byTOesv1980&list=PLA7ZcagI0frCRsdX5bIGfKU2c1xldBImV&index=24",
-    "https://www.youtube.com/watch?v=8PxSHZoOOSI&list=PLA7ZcagI0frDqjYVgX120NXz0Vq94Ga3Q&index=14",
+    "https://www.youtube.com/watch?v=5W6txLGZ1Rs&t=8s",
+    'https://www.youtube.com/watch?v=YP8YlZkrQq8',
+    'https://www.youtube.com/watch?v=y6QbtrTV-K0',
+    'https://www.youtube.com/watch?v=-aOI9_JxoWc',
+    'https://www.youtube.com/watch?v=32j2Tg64Zbg'
 ]
 count = len(os.listdir('./unlabeled_videos'))
 

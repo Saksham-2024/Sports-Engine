@@ -173,11 +173,11 @@ class VideoResolver(object):
                                 with open(f"{self.joint_save_path}/rally_{rally_info['rally count']}.json", 'w', encoding="utf-8") as f:
                                     json.dump(rally_info, f, indent=2, ensure_ascii=False)
 
-                                out = cv2.VideoWriter(f"{self.video_save_path}/video_{rally_info['rally count']}.mp4",
-                                    cv2.VideoWriter_fourcc(*'mp4v'), int(fps / frame_rate), (frame_width, frame_height))
+                                # out = cv2.VideoWriter(f"{self.video_save_path}/video_{rally_info['rally count']}.mp4",
+                                #     cv2.VideoWriter_fourcc(*'mp4v'), int(fps / frame_rate), (frame_width, frame_height))
                                 
-                                self.__create_video(out, drawn_img_list)
-                                out.release()
+                                # self.__create_video(out, drawn_img_list)
+                                # out.release()
 
                     saved_count += 1
                     print(f'{saved_count} / {target_save_count}, {stat_code}')

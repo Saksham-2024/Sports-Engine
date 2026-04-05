@@ -102,9 +102,9 @@ class RallyProcessor(object):
                     points[i] = joints[0:2]
             self.player_joint_list.append(filtered_outputs)
             self.frame_num_list.append(frame_num)
-            frame = self.__draw_key_points(position, filtered_outputs, frame)
+            # frame = self.__draw_key_points(position, filtered_outputs, frame)
 
-        self.drawn_img_list.append(frame)
+        # self.drawn_img_list.append(frame)
 
     def start_new_rally(self, rally_start_frame, rally_end_frame):
         self.rally_count += 1
