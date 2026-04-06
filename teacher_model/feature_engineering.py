@@ -3,8 +3,8 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
 
-df = pd.read_csv('3-interpolated_dataset(raw).csv')
-output_csv = '4.1-engineered_dataset.csv'
+df = pd.read_csv('3-interpolated_dataset_raw.csv')
+output_csv = '4.1-engineered_dataset_smoothed.csv'
 epsilon = 1e-8
 
 completed_strokes = set()
@@ -96,6 +96,18 @@ for (match, side, pt, strk), group in grouped:
     stroke_type = group.iloc[0]['stroke_type']
     if stroke_type == 'FAULT':
         continue
+
+    # 🟢 NEW: THE SMOOTHING FILTER 🟢
+    # Apply a centered rolling average to smooth out MediaPipe micro-jitter 
+    # before we do ANY velocity or angle math.
+    group = group.copy() # Prevent SettingWithCopyWarning
+    
+    # Isolate only the coordinate columns (x, y, z, v) for the joints we care about
+    coord_cols = [col for col in group.columns if col[0] in ['x', 'y', 'z', 'v'] and col[1:].isdigit()]
+    
+    # Apply a 3-frame rolling mean (Center=True keeps the peak of the swing aligned)
+    group[coord_cols] = group[coord_cols].rolling(window=3, min_periods=1, center=True).mean()
+    # 🟢 END SMOOTHING 🟢
 
     prev_coords = None
     prev_angles = None
@@ -311,7 +323,7 @@ y_strings = final_df.groupby(['match_no', 'playing_side', 'point_no', 'stroke_nu
 encoder = LabelEncoder()
 y_tensor = encoder.fit_transform(y_strings)
 
-np.savez_compressed('4.2-features_tensor.npz', X=X_tensor, y=y_tensor, feature_names=feature_columns, classes=encoder.classes_)
+np.savez_compressed('4.2-features_tensor_smoothed.npz', X=X_tensor, y=y_tensor, feature_names=feature_columns, classes=encoder.classes_)
 print(f"SUCCESS! Tensor shape: {X_tensor.shape}, y_tensor shape: {y_tensor.shape}")
 
 

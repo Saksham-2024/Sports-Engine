@@ -25,13 +25,13 @@ TARGET_STROKES   = {'Drive', 'Net-Kill', 'Clear', 'Dropshot'}   # ← stroke typ
 
 # _____________________________________________________________________________________________
 
-completed_strokes = set()
+last_completed = (-1, -1, -1)  # (match_no, point_no, stroke_num) of the last completed stroke in the CSV
 if os.path.exists(output_csv):
     try:
         existing_csv = pd.read_csv(output_csv, usecols=['match_no', 'point_no', 'stroke_num'])
         completed_subset = existing_csv.drop_duplicates()
-        completed_strokes = set(tuple(x) for x in completed_subset.to_numpy())
-        print(f"Resuming... Found {len(completed_strokes)} completely processed strokes in CSV.")
+        last_completed = (completed_subset.iloc[-1]['match_no'], int(completed_subset.iloc[-1]['point_no'].replace('Point', '')), completed_subset.iloc[-1]['stroke_num'])
+        print(f"Resuming... Found {len(completed_subset)} completely processed strokes in CSV.")
     except Exception as e:
         print(f"Starting fresh. Could not read output CSV: {e}")
 
@@ -190,8 +190,9 @@ for match, group in grouped:
         stroke_num = group.iloc[i]['stroke_num']
         point_no = group.iloc[i]['point_no']
 
-        current_stroke_id = (match[0], point_no, stroke_num)
-        if current_stroke_id in completed_strokes:
+        pt_no = int(point_no.replace('Point', ''))
+        current_stroke_id = (match[0], pt_no, stroke_num)
+        if current_stroke_id <= last_completed:
             print(f"Skipping Match {match[0]}, Point {point_no}, Stroke {stroke_num} - Already complete.")
             continue
         
@@ -345,7 +346,7 @@ for match, group in grouped:
             write_header = not os.path.exists(output_csv)
             stroke_df.to_csv(output_csv, mode='a', header=write_header, index=False)
             
-            completed_strokes.add(current_stroke_id)
+            last_completed = current_stroke_id
             print('successful')
         else:
             print('failed')
