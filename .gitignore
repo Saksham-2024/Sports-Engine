@@ -7,7 +7,6 @@ src/TrackNetV3/tracknet/
 dataset/
 outputs/
 runs/
-graphify-out/
 __pycache__/
 *.pyc
 
