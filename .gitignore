@@ -23,6 +23,7 @@ models/
 Research Papers/
 research_and_archives/
 docs/
+*.odt
 *.pdf
 *.png
 *.jpg
