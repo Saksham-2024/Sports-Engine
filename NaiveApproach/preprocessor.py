@@ -4,9 +4,14 @@ import pandas as pd
 import json
 import joblib
 from sklearn.preprocessing import LabelEncoder
+import yaml
 
-df = pd.read_csv('features1.csv')
-output_dir = "processed_data/"
+# Load Config
+with open('configs.yaml', 'r') as f:
+    config = yaml.safe_load(f)
+
+df = pd.read_csv(config['files']['features_final'])
+output_dir = config['paths']['output_dir']
 os.makedirs(output_dir, exist_ok=True)
 
 categorical_cols = ["player1_pos", "player2_pos", "prev_stroke_type", "shuttle_hit_from", "shuttle_hit_to"]
@@ -57,10 +62,10 @@ print(f"Total rallies: {len(sequences)}")
 print("Example sequence lengths:", [seq[0].shape[0] for seq in sequences[:5]])
 print(f"Features used: {features}")
 
-joblib.dump(sequences, output_dir + "sequences.pkl")
-joblib.dump(cat_encoders, output_dir + "categorical_encoders.pkl")
-joblib.dump(le, output_dir + "shot_label_encoder.pkl")
-with open(os.path.join(output_dir, "feature_list.json"), "w") as f:
+joblib.dump(sequences, config['files']['sequences'])
+joblib.dump(cat_encoders, config['files']['categorical_encoders'])
+joblib.dump(le, config['files']['shot_label_encoder'])
+with open(config['files']['feature_list'], "w") as f:
     json.dump(features, f)
 
 print("EXPORT COMPLETE:")

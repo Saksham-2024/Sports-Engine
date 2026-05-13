@@ -7,24 +7,32 @@ import random
 import numpy as np
 from lstm import ShotLSTM
 
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-src_dir = "processed_data/"
+import yaml
+import os
 
-sequences = joblib.load(src_dir + "sequences.pkl")
-shot_label_encoder = joblib.load(src_dir + "shot_label_encoder.pkl")
-feature_list = json.load(open(src_dir + "feature_list.json"))
+# Load Config
+with open('configs.yaml', 'r') as f:
+    config = yaml.safe_load(f)
+
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+src_dir = config['paths']['output_dir']
+
+sequences = joblib.load(config['files']['sequences'])
+shot_label_encoder = joblib.load(config['files']['shot_label_encoder'])
+feature_list = json.load(open(config['files']['feature_list']))
 
 num_classes = len(shot_label_encoder.classes_)
 input_dim = len(feature_list)
 
+hparams = config['hyperparameters']['lstm']
 model = ShotLSTM(
     input_dim=input_dim,
-    hidden_dim=256,
+    hidden_dim=hparams['hidden_dim'],
     num_classes=num_classes,
-    num_layers=3
+    num_layers=hparams['num_layers']
 ).to(DEVICE)
 
-model.load_state_dict(torch.load("lstm_model.pt", map_location=DEVICE))
+model.load_state_dict(torch.load(os.path.join(config['paths']['model_dir'], config['models']['lstm']), map_location=DEVICE))
 model.eval()
 
 print("LSTM model loaded.")

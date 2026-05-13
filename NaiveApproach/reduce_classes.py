@@ -1,5 +1,12 @@
 import pandas as pd
-df = pd.read_csv('features.csv')
+import yaml
+import os
+
+# Load Config
+with open('configs.yaml', 'r') as f:
+    config = yaml.safe_load(f)
+
+df = pd.read_csv(config['files']['features_raw'])
 
 for index, row in df.iterrows():
     if isinstance(row['stroke_type'], str) and "-Bh" in row['stroke_type']:
@@ -8,5 +15,4 @@ for index, row in df.iterrows():
     if isinstance(row['prev_stroke_type'], str) and "-Bh" in row['prev_stroke_type']:
         df.loc[index, 'prev_stroke_type'] = row['prev_stroke_type'].replace("-Bh", "")
     
-df.to_csv('features1.csv', index=False)
-
+df.to_csv(config['files']['features_final'], index=False)

@@ -1,0 +1,71 @@
+paths:
+  # Input Data (Source JSONs and Videos)
+  raw_data_dir: "../dataset/json"
+  video_dir: "../dataset/videos"
+  
+  # Local Outputs
+  output_dir: "outputs"
+  
+  # Models (Stored in Root Models Directory)
+  model_dir: "../models/naive_approach_models/ml_models"
+
+court:
+  width: 5.18       # metres
+  length: 13.4      # metres
+  net_y: 6.7        # metres from baseline to net (length / 2)
+
+files:
+  # Intermediate CSVs
+  keyframes_metadata: "outputs/keyframes_metadata.csv"
+  player_positions: "outputs/player_positions.csv"
+  features_raw: "outputs/features.csv"
+  features_final: "outputs/features1.csv"
+  
+  # Processed Assets (Now stored in outputs/ for consistency)
+  sequences: "outputs/sequences.pkl"
+  shot_label_encoder: "outputs/shot_label_encoder.pkl"
+  feature_list: "outputs/feature_list.json"
+  categorical_encoders: "outputs/categorical_encoders.pkl"
+
+models:
+  # Classical ML Models
+  decision_tree: "decision_tree_no_context.pkl"
+  decision_tree_with_context: "decision_tree_with_context.pkl"
+  random_forest: "random_forest_no_context.pkl"
+  random_forest_with_context: "random_forest_with_context.pkl"
+  xgboost: "xgboost_no_context.pkl"
+  xgboost_with_context: "xgboost_with_context.pkl"
+  
+  # Deep Learning Models
+  lstm: "lstm_model.pt"
+  lstm_checkpoint: "best_lstm_checkpoint.pt"
+
+hyperparameters:
+  lstm:
+    batch_size: 32
+    learning_rate: 0.001
+    epochs: 50
+    hidden_dim: 256
+    num_layers: 2
+    grad_clip: 1.0
+    train_ratio: 0.75
+    val_ratio: 0.15
+    test_ratio: 0.10
+    patience: 6
+    use_class_weights: false
+
+  decision_tree:
+    test_size: 0.2
+
+  yolo:
+    epochs: 50
+    imgsz: 416
+    batch: 8
+    lr0: 0.005
+    patience: 10
+    optimizer: "Adam"
+    amp: false
+
+  general:
+    seed: 42
+    device: "auto" # "cuda", "cpu", or "auto"

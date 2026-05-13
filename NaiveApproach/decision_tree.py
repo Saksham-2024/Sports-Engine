@@ -1,4 +1,5 @@
 import numpy as np
+import os
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
@@ -9,9 +10,17 @@ from sklearn.ensemble import RandomForestClassifier
 from xgboost import XGBClassifier
 import joblib
 import seaborn as sns
+import yaml
+
+# Load Config
+with open('configs.yaml', 'r') as f:
+    config = yaml.safe_load(f)
+
+SEED = config['hyperparameters']['general']['seed']
+TEST_SIZE = config['hyperparameters']['decision_tree']['test_size']
 
 # Decision Tree for shot selection based on Player Positions on a Badminton Court
-df = pd.read_csv('features1.csv')
+df = pd.read_csv(config['files']['features_final'])
 
 cols = ["player1_pos", "player2_pos", "player1_x", "player1_y", "player2_x", "player2_y", "dist_players",
          "dist_player1_net", "dist_player2_net", "disp_p1_center_dx", "disp_p1_center_dy", "disp_p2_center_dx",
@@ -40,11 +49,11 @@ vc = y.value_counts()
 stratify_var = y if vc.min() >= 2 else None
 
 X_train_no_context, X_test_no_context, y_train, y_test = train_test_split(
-    X_no_context, y, test_size=0.2, random_state=42, stratify=stratify_var
+    X_no_context, y, test_size=TEST_SIZE, random_state=SEED, stratify=stratify_var
 )
 
 X_train_with_context, X_test_with_context, y_train_with_context, y_test_with_context = train_test_split(
-    X_with_context, y, test_size=0.2, random_state=42, stratify=stratify_var
+    X_with_context, y, test_size=TEST_SIZE, random_state=SEED, stratify=stratify_var
 )
 
 if stratify_var is None:
@@ -52,29 +61,29 @@ if stratify_var is None:
 
 models_without_context = {
     "DecisionTree": DecisionTreeClassifier(
-        max_depth=12, random_state=42, class_weight="balanced",
+        max_depth=12, random_state=SEED, class_weight="balanced",
     ),
     "RandomForest": RandomForestClassifier(
-        n_estimators=200, max_depth=15, random_state=42,
+        n_estimators=200, max_depth=15, random_state=SEED,
     ),
     "XGBoost": XGBClassifier(
         n_estimators=300, max_depth=5, learning_rate=0.05,
         subsample=0.9, colsample_bytree=0.8,
-        eval_metric="mlogloss", random_state=42
+        eval_metric="mlogloss", random_state=SEED
     )
 }
 
 models_with_context = {
     "DecisionTree": DecisionTreeClassifier(
-        max_depth=12, random_state=42, class_weight="balanced",
+        max_depth=12, random_state=SEED, class_weight="balanced",
     ),
     "RandomForest": RandomForestClassifier(
-        n_estimators=200, max_depth=15, random_state=42,
+        n_estimators=200, max_depth=15, random_state=SEED,
     ),
     "XGBoost": XGBClassifier(
         n_estimators=300, max_depth=5, learning_rate=0.05,
         subsample=0.9, colsample_bytree=0.8,
-        eval_metric="mlogloss", random_state=42
+        eval_metric="mlogloss", random_state=SEED
     )
 }
 
@@ -124,13 +133,14 @@ for name, model in models_with_context.items():
     plt.ylabel("Actual")
     plt.show()
 
-joblib.dump(models_without_context["DecisionTree"], "ml_models/decision_tree_no_context.pkl")
-joblib.dump(models_with_context["DecisionTree"], "ml_models/decision_tree_with_context.pkl")
-joblib.dump(models_without_context["RandomForest"], "ml_models/random_forest_no_context.pkl")
-joblib.dump(models_with_context["RandomForest"], "ml_models/random_forest_with_context.pkl")
-joblib.dump(models_without_context["XGBoost"], "ml_models/xgboost_no_context.pkl")
-joblib.dump(models_with_context["XGBoost"], "ml_models/xgboost_with_context.pkl")
-for col, le in encoders.items():
-    joblib.dump(le, f"ml_models/{col}_encoder.pkl")
+model_save_path = config['paths']['model_dir']
+os.makedirs(model_save_path, exist_ok=True)
 
+joblib.dump(models_without_context["DecisionTree"], os.path.join(model_save_path, config['models']['decision_tree']))
+joblib.dump(models_without_context["RandomForest"], os.path.join(model_save_path, config['models']['random_forest']))
+joblib.dump(models_without_context["XGBoost"], os.path.join(model_save_path, config['models']['xgboost']))
+
+joblib.dump(models_with_context["DecisionTree"], os.path.join(model_save_path, config['models']['decision_tree_with_context']))
+joblib.dump(models_with_context["RandomForest"], os.path.join(model_save_path, config['models']['random_forest_with_context']))
+joblib.dump(models_with_context["XGBoost"], os.path.join(model_save_path, config['models']['xgboost_with_context']))
 

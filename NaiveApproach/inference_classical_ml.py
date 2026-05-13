@@ -3,21 +3,28 @@ import joblib
 import random
 from sklearn.preprocessing import LabelEncoder
 
-src_dir = "ml_models/"
-csv_path = "features.csv"
+import yaml
+import os
+
+# Load Config
+with open('configs.yaml', 'r') as f:
+    config = yaml.safe_load(f)
+
+src_dir = config['paths']['model_dir']
+csv_path = config['files']['features_final']
 
 df = pd.read_csv(csv_path)
 
 models = {
-    "DT": joblib.load(src_dir + "decision_tree_no_context.pkl"),
-    "RF": joblib.load(src_dir + "random_forest_no_context.pkl"),
-    "XGB": joblib.load(src_dir + "xgboost_no_context.pkl"),
-    "DT_CTX": joblib.load(src_dir + "decision_tree_with_context.pkl"),
-    "RF_CTX": joblib.load(src_dir + "random_forest_with_context.pkl"),
-    "XGB_CTX": joblib.load(src_dir + "xgboost_with_context.pkl"),
+    "DT": joblib.load(os.path.join(src_dir, config['models']['decision_tree'])),
+    "RF": joblib.load(os.path.join(src_dir, config['models']['random_forest'])),
+    "XGB": joblib.load(os.path.join(src_dir, config['models']['xgboost'])),
+    "DT_CTX": joblib.load(os.path.join(src_dir, config['models']['decision_tree_with_context'])),
+    "RF_CTX": joblib.load(os.path.join(src_dir, config['models']['random_forest_with_context'])),
+    "XGB_CTX": joblib.load(os.path.join(src_dir, config['models']['xgboost_with_context'])),
 }
 
-shot_encoder = joblib.load("processed_data/shot_label_encoder.pkl")
+shot_encoder = joblib.load(config['files']['shot_label_encoder'])
 
 no_context_features = [
     'player1_x','player1_y','player2_x','player2_y',
@@ -31,10 +38,10 @@ no_context_features = [
 
 context_features = no_context_features + ['prev_stroke_type_enc']
 
-stroke_encoder = joblib.load(src_dir + "stroke_type_encoder.pkl")
-prev_stroke_encoder = joblib.load(src_dir + "prev_stroke_type_encoder.pkl")
-p1_pos_encoder = joblib.load(src_dir + "player1_pos_encoder.pkl")
-p2_pos_encoder = joblib.load(src_dir + "player2_pos_encoder.pkl")
+stroke_encoder    = joblib.load(config['files']['stroke_type_encoder'])
+prev_stroke_encoder = joblib.load(config['files']['prev_stroke_type_encoder'])
+p1_pos_encoder    = joblib.load(config['files']['player1_pos_encoder'])
+p2_pos_encoder    = joblib.load(config['files']['player2_pos_encoder'])
 
 df['stroke_type_enc'] = stroke_encoder.transform(
     df['stroke_type'].astype(str)
@@ -52,8 +59,6 @@ df['player2_pos_enc'] = p2_pos_encoder.transform(
     df['player2_pos'].astype(str)
 )
 
-
-context_features = no_context_features + ['prev_stroke_type_enc']
 
 idx = random.randint(0, len(df) - 1)
 row = df.iloc[idx]

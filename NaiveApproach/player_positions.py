@@ -7,7 +7,19 @@ try:
 except Exception:
     mp = None
 
-image_path = "KeyFrames/match_1_point_Point1_stroke_1.jpg"
+import yaml
+
+# Load Config
+with open('configs.yaml', 'r') as f:
+    config = yaml.safe_load(f)
+
+# Court constants from config
+_court = config['court']
+COURT_WIDTH  = _court['width']   # 5.18 m
+COURT_LENGTH = _court['length']  # 13.4 m
+NET_Y        = _court['net_y']   # 6.7 m
+
+image_path = os.path.join(config['paths']['output_dir'], "Keyframes", "match_1_point_Point1_stroke_1.jpg")
 image = cv2.imread(image_path)
 if image is None:
     raise FileNotFoundError(f"Could not read initial image for homography: {image_path}")
@@ -32,12 +44,12 @@ print("Selected corner points (camera view):", points)
 if len(points) != 4:
     raise ValueError("You must click exactly 4 corners (top-left, top-right, bottom-right, bottom-left)")
 
-# Define the real-world coordinates (in meters)
+# Define the real-world coordinates (in metres)
 real_world_court = np.array([
-    [0, 0],        # top-left
-    [5.18, 0],     # top-right
-    [5.18, 13.4],  # bottom-right
-    [0, 13.4]      # bottom-left
+    [0,            0           ],  # top-left
+    [COURT_WIDTH,  0           ],  # top-right
+    [COURT_WIDTH,  COURT_LENGTH],  # bottom-right
+    [0,            COURT_LENGTH]   # bottom-left
 ], dtype=np.float32)
 
 # Compute homography matrix
@@ -63,7 +75,7 @@ def detect_players(image, model, H):
         if int(cl) == 0:
             cx, cy = (x1 + x2) // 2, y2
             court_x, court_y = pixel_to_court(cx, cy, H)
-            if 0 <= court_x <= 5.18 and 0 <= court_y <= 13.4:
+            if 0 <= court_x <= COURT_WIDTH and 0 <= court_y <= COURT_LENGTH:
                 cv2.rectangle(image, (int(x1), int(y1)), (int(x2), int(y2)), (255, 0, 0), 2)
                 players.append((cx, cy))
                 boxes.append((int(x1), int(y1), int(x2), int(y2), conf, int(cl)))
@@ -73,32 +85,32 @@ def detect_players(image, model, H):
 
 def pos_on_court_along_length(x, y, player):
     if player == 1:
-        if 0 <= y <= 6.7 / 3:
+        if 0 <= y <= NET_Y / 3:
             return "Back"
-        elif 6.7 / 3 < y <= 2 * 6.7 / 3:
+        elif NET_Y / 3 < y <= 2 * NET_Y / 3:
             return "Middle"
-        elif 2 * 6.7 / 3 < y <= 6.7:
+        elif 2 * NET_Y / 3 < y <= NET_Y:
             return "Front"
     else:
-        if 6.7 < y <= 13.4 - 2 * 6.7 / 3:
+        if NET_Y < y <= COURT_LENGTH - 2 * NET_Y / 3:
             return "Front"
-        elif 13.4 - 2 * 6.7 / 3 < y <= 13.4 - 6.7 / 3:
+        elif COURT_LENGTH - 2 * NET_Y / 3 < y <= COURT_LENGTH - NET_Y / 3:
             return "Middle"
-        elif 13.4 - 6.7 / 3 < y <= 13.4:
+        elif COURT_LENGTH - NET_Y / 3 < y <= COURT_LENGTH:
             return "Back"
 
 def pos_on_court_along_width(x, y, player):
     if player == 2:
-        if 0 <= x <= 5.18 / 3:
+        if 0 <= x <= COURT_WIDTH / 3:
             return "Left"
-        elif 5.18 / 3 < x <= 2 * 5.18 / 3:
+        elif COURT_WIDTH / 3 < x <= 2 * COURT_WIDTH / 3:
             return "Center"
         else:
             return "Right"
     else:
-        if 0 <= x <= 5.18 / 3:
+        if 0 <= x <= COURT_WIDTH / 3:
             return "Right"
-        elif 5.18 / 3 < x <= 2 * 5.18 / 3:
+        elif COURT_WIDTH / 3 < x <= 2 * COURT_WIDTH / 3:
             return "Center"
         else:
             return "Left"
@@ -110,10 +122,10 @@ def pos_on_court(x, y, player):
         return width_pos or length_pos or "Unknown"
     else: return width_pos + '-' + length_pos
 
-skeleton_dir = "Skeleton_marked_frames"
+skeleton_dir = os.path.join(config['paths']['output_dir'], "Skeleton_marked_frames")
 os.makedirs(skeleton_dir, exist_ok=True)
 records = []
-df = pd.read_csv("keyframes_metadata.csv")
+df = pd.read_csv(config['files']['keyframes_metadata'])
 mp_pose = mp.solutions.pose if mp is not None else None
 pose_model = None 
 if mp_pose is not None:
@@ -217,5 +229,5 @@ for i in range(len(df)):
 
     print(f"Annotated frame saved to: {output_path}")
 
-csv_path = os.path.join("player_positions.csv")
+csv_path = config['files']['player_positions']
 pd.DataFrame(records).to_csv(csv_path, index=False)

@@ -1,0 +1,73 @@
+
+global:
+  project_root: "/home/saksham/projects and programming/BTech_Project"
+  dataset_dir: "dataset"
+  video_dir: "dataset/videos"
+  output_dir: "outputs"
+  model_dir: "models"
+  random_seed: 42
+
+dataset_creation:
+  # Pipeline Paths
+  segments_dir: "outputs/segments"
+  shuttle_tracks_dir: "outputs/shuttle_tracks"
+  player_tracks_dir: "outputs/player_tracks"
+  pre_final_csv: "outputs/pre_final_dataset.csv"
+  transformer_dataset_csv: "outputs/transformer_dataset.csv"
+  
+  # Calibration Caches
+  homography_cache: "outputs/homography_cache.pkl"
+  camera_pose_cache: "outputs/camera_pose_cache.pkl"
+  
+  # Physics & Court Constants
+  court:
+    width: 5.18
+    length: 13.4
+    net_height: 1.55
+    back_boundary_to_net: 6.7
+  physics:
+    gravity: 9.81
+    air_density: 1.225
+    shuttle_mass: 0.0052  # kg
+    drag_coefficient: 0.44
+    cross_section_area: 0.0033  # m^2
+
+tranSPORTmer:
+  # Architecture
+  model:
+    input_dim: 3
+    d_model: 128
+    num_heads: 8
+    num_encoder_layers: 2
+    d_ff: 512
+    dropout: 0.1
+    num_agents: 3
+    seq_len: 125
+    target_seq_len: 35
+    
+  # Training Hyperparameters
+  training:
+    batch_size: 32
+    learning_rate: 0.0001
+    epochs: 100
+    val_split: 0.2
+    stride: 25
+    
+  # IO Paths
+  data:
+    cleaning_stats: "outputs/xy_cleaning_stats.json"
+    cleaned_csv: "outputs/transformer_dataset_xy_cleaned.csv"
+    normalized_csv: "outputs/transformer_dataset_normalized.csv"
+    training_data_dir: "outputs/training_data"
+    normalization_stats: "outputs/normalization_stats.json"
+  weights:
+    best_weights: "models/best_TranSPORTmer_weights.pth"
+
+naive_bayes:
+  dataset_paths: 
+    - "match1.json"
+  winning_prob_threshold: 0.5
+
+models:
+  sacnn: "models/sacnn.pt"
+  yolo: "models/yolov8m.pt"

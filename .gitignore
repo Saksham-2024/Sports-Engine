@@ -1,15 +1,33 @@
-dataset/ 
-failed_YOLO_finetuning/ 
-Research Papers/ 
+# Environments
 venv/
-__pychache__/
+src/TrackNetV3/tracknet/
+.agent/
+
+# Data & Outputs
+dataset/
+outputs/
+runs/
+graphify-out/
+__pycache__/
 *.pyc
-match1_(for_shuttle_trajectory_and_shot_classification).mp4
-Signed-synopsis.pdf
-NaiveApproach/Skeleton_marked_frames/
-NaiveApproach/KeyFrames/
-*.csv
+
+# Models & Large Artifacts
+models/
 *.pt
-*.npz
+*.pth
+*.pkl
+*.zip
+*.csv
+
+# Documents & Images (Except READMEs)
+Research Papers/
+research_and_archives/
+docs/
 *.pdf
-dataset_expansion/unlabeled_videos/
+*.png
+*.jpg
+*.mp4
+
+# Specific Project Junk
+match1_(for_shuttle_trajectory_and_shot_classification).mp4
+shot_types.pkl

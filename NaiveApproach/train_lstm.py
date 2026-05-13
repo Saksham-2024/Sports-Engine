@@ -9,25 +9,38 @@ from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence, pad_packed_se
 from sklearn.metrics import accuracy_score, f1_score, confusion_matrix
 from lstm import ShotLSTM 
 
-SRC_DIR = "processed_data/"
-SEED = 42
+import yaml
 
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# Load Config
+with open('configs.yaml', 'r') as f:
+    config = yaml.safe_load(f)
+
+# Resolve device from config ("auto", "cuda", or "cpu")
+_device_cfg = config['hyperparameters']['general']['device']
+if _device_cfg == "auto":
+    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+else:
+    DEVICE = torch.device(_device_cfg)
+
 IGNORE_INDEX = -100
 
-BATCH_SIZE = 32
-LR = 1e-3
-EPOCHS = 50
-HIDDEN_DIM = 256
-NUM_LAYERS = 2
-GRAD_CLIP = 1.0
+# Training Params from Config
+train_cfg = config['hyperparameters']['lstm']
+BATCH_SIZE = train_cfg['batch_size']
+LR = train_cfg['learning_rate']
+EPOCHS = train_cfg['epochs']
+HIDDEN_DIM = train_cfg['hidden_dim']
+NUM_LAYERS = train_cfg['num_layers']
+GRAD_CLIP = train_cfg['grad_clip']
 
-TRAIN_RATIO = 0.75
-VAL_RATIO = 0.15
-TEST_RATIO = 0.10
+TRAIN_RATIO = train_cfg['train_ratio']
+VAL_RATIO = train_cfg['val_ratio']
+TEST_RATIO = train_cfg['test_ratio']
 
-PATIENCE = 6             
-USE_CLASS_WEIGHTS = False
+PATIENCE = train_cfg['patience']
+USE_CLASS_WEIGHTS = train_cfg['use_class_weights']
+
+SEED = config['hyperparameters']['general']['seed']
 
 random.seed(SEED)
 np.random.seed(SEED)
@@ -35,10 +48,9 @@ torch.manual_seed(SEED)
 if DEVICE.type == "cuda":
     torch.cuda.manual_seed_all(SEED)
 
-src_dir = "processed_data/"
-sequences = joblib.load(src_dir + "sequences.pkl")
-shot_label_encoder = joblib.load(src_dir + "shot_label_encoder.pkl")
-features = json.load(open(src_dir + "feature_list.json"))
+sequences = joblib.load(config['files']['sequences'])
+shot_label_encoder = joblib.load(config['files']['shot_label_encoder'])
+features = json.load(open(config['files']['feature_list']))
 
 num_classes = len(shot_label_encoder.classes_)
 input_dim = len(features)
@@ -174,13 +186,15 @@ for epoch in range(1, EPOCHS + 1):
 
     if val_f1 > best_val_f1:
         best_val_f1 = val_f1
+        model_save_path = config['paths']['model_dir']
+        os.makedirs(model_save_path, exist_ok=True)
         torch.save({
             "model_state": model.state_dict(),
             "optimizer_state": optimizer.state_dict(),
             "epoch": epoch,
             "feature_cols": features,
             "shot_classes": shot_label_encoder.classes_.tolist()
-        }, "best_lstm_checkpoint.pt")
+        }, os.path.join(model_save_path, config['models']['lstm_checkpoint']))
         patience_counter = 0
         print(f"  Saved new best model (ValF1={val_f1:.4f})")
     else:
@@ -190,7 +204,7 @@ for epoch in range(1, EPOCHS + 1):
             break
 
 print("Loading best model for final evaluation on test set...")
-ckpt = torch.load("best_lstm_checkpoint.pt", map_location=DEVICE)
+ckpt = torch.load(os.path.join(config['paths']['model_dir'], config['models']['lstm_checkpoint']), map_location=DEVICE)
 model.load_state_dict(ckpt["model_state"])
 
 test_loss, test_acc, test_f1 = evaluate(test_loader, model, DEVICE)
@@ -212,5 +226,6 @@ if len(all_targets) > 0:
     cm = confusion_matrix(all_targets, all_preds, labels=list(range(num_classes)))
     print("Confusion matrix shape:", cm.shape)
 
-torch.save(model.state_dict(), "lstm_model.pt")
-print("Training complete. Model saved to lstm_model.pt")
+lstm_final_path = os.path.join(config["paths"]["model_dir"], config["models"]["lstm"])
+torch.save(model.state_dict(), lstm_final_path)
+print(f"Training complete. Model saved to {lstm_final_path}")

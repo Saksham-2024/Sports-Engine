@@ -2,11 +2,17 @@ import cv2
 import os
 import pandas as pd
 import json
-# import get_data from NaiveBayes_Predictor
-# Function to get FPS of a video. called for each video in video_path while processing
-output_dir = "KeyFrames"
-video_dir = "../dataset/videos/"
-json_dir = "../dataset/json/"
+
+import yaml
+
+# Load Config
+with open('configs.yaml', 'r') as f:
+    config = yaml.safe_load(f)
+
+output_dir = os.path.join(config['paths']['output_dir'], "Keyframes")
+video_dir = config['paths']['video_dir']
+json_dir = config['paths']['raw_data_dir']
+
 os.makedirs(output_dir, exist_ok=True)
 records = []
 
@@ -62,8 +68,8 @@ def save_frame(match, frame, point, stroke_num, stroke_type, playingSide):
         "image_path": image_path
     })
 
-video_paths = [video_dir + "match1.mp4", video_dir + "match2.mp4", video_dir + "match3.mp4", video_dir + "match4.mp4", video_dir + "match5.mp4", video_dir + "match6.mp4", video_dir + "match7.mp4", video_dir + "match8.mp4", video_dir + "match9.mp4"]
-dataset = [json_dir + "match1.json", json_dir + "match2.json", json_dir + "match3.json", json_dir + "match4.json", json_dir + "match5.json", json_dir + "match6.json", json_dir + "match7.json", json_dir + "match8.json", json_dir + "match9.json"]
+video_paths = [os.path.join(video_dir, f"match{i}.mp4") for i in range(1, 10)]
+dataset = [os.path.join(json_dir, f"match{i}.json") for i in range(1, 10)]
 for i, match in enumerate(dataset):
     Data = get_data(match)
     data = extract_timestamps(Data)
@@ -78,7 +84,7 @@ for i, match in enumerate(dataset):
                 save_frame(i+1, frame, point, stroke_num, stroke_type, playingSide)
 
 df = pd.DataFrame(records)
-df.to_csv("keyframes_metadata.csv", index=False)
+df.to_csv(config['files']['keyframes_metadata'], index=False)
 cap.release()
     
 

@@ -1,9 +1,18 @@
 import numpy as np
 import pandas as pd
+import yaml
 
-df = pd.read_csv('player_positions.csv')
-court_dimensions = [[0, 0], [5.18, 0], [5.18, 13.4], [0, 13.4]]
-net_dimensions = [[0, 6.7], [5.18, 6.7]]
+# Load Config
+with open('configs.yaml', 'r') as f:
+    config = yaml.safe_load(f)
+
+# Court constants from config
+_court = config['court']
+COURT_WIDTH = _court['width']   # 5.18 m
+COURT_LENGTH = _court['length']  # 13.4 m
+NET_Y = _court['net_y']          # 6.7 m
+
+df = pd.read_csv(config['files']['player_positions'])
 
 def euclid(x1, y1, x2, y2):
     # convert to scalars (we only use scalars here)
@@ -33,11 +42,11 @@ for index, row in df.iterrows():
     vel_p2_dy = np.nan
 
     dist_players = round(euclid(p1x, p1y, p2x, p2y), 3)
-    dist_player1_net = round(abs(p1y - 6.7), 3) if np.isfinite(p1y) else np.nan
-    dist_player2_net = round(abs(p2y - 6.7), 3) if np.isfinite(p2y) else np.nan
+    dist_player1_net = round(abs(p1y - NET_Y), 3) if np.isfinite(p1y) else np.nan
+    dist_player2_net = round(abs(p2y - NET_Y), 3) if np.isfinite(p2y) else np.nan
 
-    center1 = (2.59, 3.35)  # center of player 1 side
-    center2 = (2.59, 10.05) # center of player 2 side
+    center1 = (COURT_WIDTH / 2, NET_Y / 2)           # (2.59, 3.35) — centre of player-1 side
+    center2 = (COURT_WIDTH / 2, NET_Y + NET_Y / 2)   # (2.59, 10.05) — centre of player-2 side
 
     # displacements from center (without signs. set according to hitter later)
     disp_p1_center_dx = round(p1x - center1[0], 3)
@@ -169,4 +178,4 @@ for col in cols:
 features_df[cols] = features_df[cols].fillna(0)
 features_df["prev_stroke_type_mask"] = 0 if features_df["prev_stroke_type"].isnull().all() else 1
 
-features_df.to_csv('features.csv', index=False)
+features_df.to_csv(config['files']['features_raw'], index=False)
