@@ -8,6 +8,8 @@ import cv2
 import torch 
 import sys
 import yaml
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from schemas import TrackNetCommand
 
 with open('../../configs/configs.yaml', 'r') as f:
     configs = yaml.safe_load(f)
@@ -42,11 +44,18 @@ MAX_PARALLEL_MATCHES = len(AVAILABLE_GPUS) * WORKERS_PER_GPU if len(AVAILABLE_GP
 def natural_sort_key(s):
     return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', s)]
 
-def run_tracknet(video_path, save_dir, gpu_id, thread_id):
+def run_tracknet(command_items: TrackNetCommand):
     """Run TrackNet iteratively per segment on a specific GPU. Returns (success, match_stem, stderr)."""
+    video_path = command_items.video_path
+    save_dir = command_items.save_dir
+    gpu_id = command_items.gpu_id
+    thread_id = command_items.thread_id
+
     os.makedirs(save_dir, exist_ok=True)
     match_stem = os.path.splitext(os.path.basename(video_path))[0]
     
+    # csv validation for segments file 
+
     segment_file = os.path.join(SEGMENTS_PATH, f"{match_stem}.json")
     print(segment_file)
     segments = []
@@ -140,7 +149,13 @@ def main():
 
             # Position the progress bar based on logical thread slot
             slot_id = thread_id % MAX_PARALLEL_MATCHES
-            future = executor.submit(run_tracknet, video_path, save_tracks_dir, gpu_id, slot_id)
+            command_items = TrackNetCommand(
+                video_path=video_path,
+                save_dir=save_tracks_dir,
+                gpu_id=gpu_id,
+                thread_id=slot_id
+            )
+            future = executor.submit(run_tracknet, command_items)
             tasks[future] = (match_stem, gpu_id)
         
         # Track completion

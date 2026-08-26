@@ -2,6 +2,9 @@ import os
 import subprocess
 from tqdm import tqdm #type: ignore
 import yaml
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from schemas import VideoFileStatus
 
 with open('../../configs/configs.yaml', 'r') as f:
     configs = yaml.safe_load(f)
@@ -102,22 +105,23 @@ if not video_files:
 
 print(f"Found {len(video_files)} video(s) in {VIDEO_DIR}\n")
 
-already_h264 = []
-to_convert   = []
+video_statuses = []
 
 print("Checking codecs...")
 for filename in tqdm(video_files, desc='Scanning', unit='file'):
     filepath = os.path.join(VIDEO_DIR, filename)
     codec    = get_codec(filepath)
-    if codec == 'h264':
-        already_h264.append(filename)
-    else:
-        to_convert.append((filename, codec))
+    status = VideoFileStatus(filename=filename, filepath=filepath, codec=codec, needs_conversion=(codec!='h264'), duration=get_duration_seconds(filepath))
+    video_statuses.append(status)
 
-print(f"\n  {len(already_h264)} already H264 — skipping")
+
+already_h264 = [video.filename for video in video_statuses if not video.needs_conversion]
+to_convert   = [(video.filename, video.codec) for video in video_statuses if video.needs_conversion]
+
+print(f"\n  {len(already_h264)} already h264 encoded.")
 for f in already_h264:
-    print(f"    Skipping {f} - already in h264 format")
-
+    print(f"    • {f}")
+    
 print(f"\n  {len(to_convert)} need conversion:")
 for f, c in to_convert:
     print(f"    • {f}  [{c.upper()}]")

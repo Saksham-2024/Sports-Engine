@@ -1,6 +1,9 @@
 import yt_dlp #type: ignore
 import os
 import yaml
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from schemas import VideoLink
 
 with open('../../configs/configs.yaml', 'r') as f:
     configs = yaml.safe_load(f)
@@ -54,37 +57,40 @@ video_links = [
 
 output_dir = os.path.join(configs['global']['project_root'], configs['global']['video_dir'])
 os.makedirs(output_dir, exist_ok=True)
-
+req_videos = VideoLink(links=video_links)
 # Using a stable index (1 to N) prevents numbering drift when re-running the script
-for i, link in enumerate(video_links, start=10):
-    output_path = f'{output_dir}/match{i}.mp4'
-    
-    if os.path.exists(output_path):
-        print(f"Skipping video {i} - already exists at {output_path}")
-        continue
+def download(req_videos: VideoLink):
+    for i, link in enumerate(req_videos.links, start=10):
+        output_path = f'{output_dir}/match{i}.mp4'
+        
+        if os.path.exists(output_path):
+            print(f"Skipping video {i} - already exists at {output_path}")
+            continue
 
-    ydl_opts = {
-        'format': 'bestvideo[height<=720][ext=mp4][vcodec^=avc1]',
-        'outtmpl': output_path,
-        'noplaylist': True,
-        'ignoreerrors': True,
-        'socket_timeout': 30,
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['web'],  # Try web client first
-                'player_skip': ['configs'],  # Skip some challenges
-            }
-        },
-        'postprocessors': [{
-            'key': 'FFmpegVideoRemuxer',
-            'preferedformat': 'mp4',
-        }],
-    }
-    
-    print(f"\n--- Downloading video {i}: {link} ---")
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([link])
-    except Exception as e:
-        print(f"Error downloading video {i}: {e}")
+        ydl_opts = {
+            'format': 'bestvideo[height<=720][ext=mp4][vcodec^=avc1]',
+            'outtmpl': output_path,
+            'noplaylist': True,
+            'ignoreerrors': True,
+            'socket_timeout': 30,
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['web'],  # Try web client first
+                    'player_skip': ['configs'],  # Skip some challenges
+                }
+            },
+            'postprocessors': [{
+                'key': 'FFmpegVideoRemuxer',
+                'preferedformat': 'mp4',
+            }],
+        }
+        
+        print(f"\n--- Downloading video {i}: {link} ---")
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([str(link)])
+        except Exception as e:
+            print(f"Error downloading video {i}: {e}")
 
+if __name__ == '__main__':
+    download(urls)

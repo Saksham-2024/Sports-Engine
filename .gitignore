@@ -31,3 +31,6 @@ docs/
 # Specific Project Junk
 match1_(for_shuttle_trajectory_and_shot_classification).mp4
 shot_types.pkl
+
+# graphify files
+graphify-out/

@@ -8,6 +8,8 @@ import pickle
 import json
 from ultralytics import YOLO
 import yaml
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from schemas import Img2Court, PlayerPosition
 
 with open('../../configs/configs.yaml', 'r') as f:
     configs = yaml.safe_load(f)
@@ -44,13 +46,15 @@ def natural_sort_key(s):
     return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', s)]
 
 
-def process_video(video_path, H):
+def process_video(obj: Img2Court):
     """
     Process a full video frame-by-frame:
       - SACNN gates every frame as court_view or not.
       - YOLO + homography runs ONLY on court_view frames.
     Outputs a single CSV with per-frame data.
     """
+    video_path = obj.video_path
+    H = obj.H
     match_name = os.path.splitext(os.path.basename(video_path))[0]
 
     cap = cv2.VideoCapture(video_path)
@@ -60,6 +64,7 @@ def process_video(video_path, H):
 
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     segment_file = os.path.join(SEGMENTS_DIR, f"{match_name}.json")
+    # csv validation for segments file
     segments = None
     if os.path.exists(segment_file):
         with open(segment_file, 'r') as f:
@@ -148,21 +153,29 @@ def process_video(video_path, H):
                         court_x, court_y = court_coords[0], court_coords[1]
                         if is_on_court(court_x, court_y):
                             # Convert types so json serialization succeeds
-                            players_pos.append((float(court_x), float(court_y), float(x1), float(y1), float(x2), float(y2)))
+                            player = PlayerPosition(
+                                c_x = court_x,
+                                c_y = court_y,
+                                x1 = x1,
+                                y1 = y1,
+                                x2 = x2,
+                                y2 = y2
+                            )
+                            players_pos.append(player)
 
         if len(players_pos) > 0:
-            players_pos.sort(key=lambda p: p[1])  # sort by court_y: lower = far side
+            players_pos.sort(key=lambda p: p.c_y)  # sort by court_y: lower = far side
 
             # P1 = far side (lower court_y)
-            row['p1_cx'], row['p1_cy'] = players_pos[0][0], players_pos[0][1]
-            row['p1x1'], row['p1y1'] = players_pos[0][2], players_pos[0][3]
-            row['p1x2'], row['p1y2'] = players_pos[0][4], players_pos[0][5]
+            row['p1_cx'], row['p1_cy'] = players_pos[0].c_x, players_pos[0].c_y
+            row['p1x1'], row['p1y1'] = players_pos[0].x1, players_pos[0].y1
+            row['p1x2'], row['p1y2'] = players_pos[0].x2, players_pos[0].y2
 
             if len(players_pos) == 2:
                 # P2 = near side (higher court_y)
-                row['p2_cx'], row['p2_cy'] = players_pos[1][0], players_pos[1][1]
-                row['p2x1'], row['p2y1'] = players_pos[1][2], players_pos[1][3]
-                row['p2x2'], row['p2y2'] = players_pos[1][4], players_pos[1][5]
+                row['p2_cx'], row['p2_cy'] = players_pos[1].c_x, players_pos[1].c_y
+                row['p2x1'], row['p2y1'] = players_pos[1].x1, players_pos[1].y1
+                row['p2x2'], row['p2y2'] = players_pos[1].x2, players_pos[1].y2
 
         if current_segment is not None:
             current_positions.append(row)
@@ -209,13 +222,16 @@ def main():
 
     for video_file in video_files:
         video_path = os.path.join(VIDEO_DIR, video_file)
-
         H = matrices.get(video_file)
-        if H is None:
-            print(f"  [SKIP] No homography matrix for {video_file}")
+        try:
+            img2court = Img2Court(
+                video_path=video_path,
+                H=H
+            )
+        except ValidationError as e:
+            print(f"  [SKIP] Invalid data for {video_file}: {e}")
             continue
-
-        process_video(video_path, H)
+        process_video(img2court)
 
     print("\n Third Pass Complete! Player positions logged.")
 
