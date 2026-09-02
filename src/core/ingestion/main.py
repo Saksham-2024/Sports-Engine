@@ -49,7 +49,7 @@ video_links = [
     'https://www.youtube.com/watch?v=IuXmsimDOW8'
 ]
 
-if __name__ == "__main __":
+if __name__== "__main__":
     downloader = Downloader(video_links)
     downloader.download()
     transcoder = Transcoder()
