@@ -20,6 +20,15 @@ class PathResolver:
         for k in keys:
             value = value[k]
         return self.project_root / value
+    
+    def get_config(self, key: str = None):
+        """Returns any config value, dictionary, or parameter using dot notation."""
+        if key is None:
+            return self.configs
+        value = self.configs
+        for k in key.split("."):
+            value = value[k]
+        return value
 
         
 

@@ -6,7 +6,7 @@ from src.core.utils.configs import PathResolver
 class Downloader:
     def __init__(self, urls):
         self.resolver = PathResolver()
-        self.video_dir = self.resolver.get_path("ingestion.video_dir")
+        self.video_dir = self.resolver.get_path("global.video_dir")
         if not os.path.exists(self.video_dir):
             os.makedirs(self.video_dir, exist_ok=True)
         self.urls = urls

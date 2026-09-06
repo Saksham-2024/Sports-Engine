@@ -6,7 +6,7 @@ import subprocess
 class Transcoder:
     def __init__(self):
         self.resolver = PathResolver()
-        self.video_dir = self.resolver.get_path("ingestion.video_dir")
+        self.video_dir = self.resolver.get_path("global.video_dir")
         self.video_files = sorted([
             f for f in os.listdir(self.video_dir)
             if f.endswith('.mp4') and not f.endswith('_converting.mp4')
@@ -24,7 +24,7 @@ class Transcoder:
                 self.needs_conversion.append((filename, codec))
             
         if len(self.needs_conversion) > 0:
-            print(f"{len(self.needs_conversion)} files need conversiom")
+            print(f"{len(self.needs_conversion)} files need conversion")
         else:
             print("All files are h264")
 

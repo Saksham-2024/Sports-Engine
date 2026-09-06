@@ -71,3 +71,5 @@ naive_bayes:
 models:
   sacnn: "models/sacnn.pt"
   yolo: "models/yolov8m.pt"
+
+dev_mode: True
