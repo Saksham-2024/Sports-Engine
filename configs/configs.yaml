@@ -28,9 +28,10 @@ dataset_creation:
   physics:
     gravity: 9.81
     air_density: 1.225
-    shuttle_mass: 0.0052  # kg
+    shuttle_mass: 0.0055  # kg
     drag_coefficient: 0.44
-    cross_section_area: 0.0033  # m^2
+    cross_section_area: 0.0028  # m^2
+    fps: 25
 
 tranSPORTmer:
   # Architecture
@@ -71,3 +72,5 @@ naive_bayes:
 models:
   sacnn: "models/sacnn.pt"
   yolo: "models/yolov8m.pt"
+
+dev_mode: True

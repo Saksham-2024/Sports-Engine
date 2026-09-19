@@ -13,8 +13,8 @@ graph TD
     A[download_videos.py] -->|Raw MP4| B[ensure_h264_encoding.py]
     B -->|H.264 MP4| C[segment_pass.py]
     C -->|Rally Segments JSON| D[homography.py]
-    D -->|Camera Caches .pkl| E[shuttle_pass.py]
-    D -->|Camera Caches .pkl| F[player_pass.py]
+    D --> |CAMERA POSE CACHE .pkl| H[apply_physics.py]
+    D -->|HOMOGRAPHY CACHE .pkl| F[player_pass.py]
     C --> E
     C --> F
     E -->|Shuttle Pixels CSV| G[combine_player_shuttle_data.py]
@@ -22,6 +22,7 @@ graph TD
     G -->|pre_final_dataset.csv| H[apply_physics.py]
     D --> H
     H -->|transformer_dataset.csv| I[verify_shuttle_coords.py]
+    Z[TrackNetV3] --> E[shuttle_pass.py]
 ```
 
 ## 📄 File Summaries
