@@ -4,3 +4,4 @@
 4. verify each file has proper logging
 5. ensure correct paths are being used in each module
 5. lint all files for bugs
+7. ensure solid design principles
