@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "courtsense"
+version = "0.1.0"
+description = "Badminton trajectory prediction using Transformers and physics models"
+readme = "README.md"
+requires-python = ">=3.10"
+
+[tool.setuptools.packages.find]
+# Removed 'where' to ensure 'src' is treated as the root package
+

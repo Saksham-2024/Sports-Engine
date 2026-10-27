@@ -36,20 +36,20 @@ class XYAnomalyHandler:
             'segments_created': 0
         }
     
-    def is_anomalous(self, x, y):
+    def is_anomalous(self, x, y, z):
         """Check if XY coordinate is anomalous."""
-        if pd.isna(x) or pd.isna(y):
+        if pd.isna(x) or pd.isna(y) or pd.isna(z):
             return True  # NaN is treated as anomaly
-        return (x < self.x_min or x > self.x_max) or (y < self.y_min or y > self.y_max)
+        return (x < self.x_min or x > self.x_max) or (y < self.y_min or y > self.y_max) or (z < 0 or z > 15)
     
-    def find_anomaly_bands(self, x_series, y_series):
+    def find_anomaly_bands(self, x_series, y_series, z_series):
         """
         Identify consecutive anomalous frames.
         
         Returns:
-            List of (start_idx, end_idx, size) tuples
+            List of (start_idx, end_idx + 1 (or start idx of new non anomalous series/band), size) tuples
         """
-        anomaly_mask = [self.is_anomalous(x, y) for x, y in zip(x_series, y_series)]
+        anomaly_mask = [self.is_anomalous(x, y, z) for x, y, z in zip(x_series, y_series, z_series)]
         
         bands = []
         in_band = False
@@ -71,10 +71,11 @@ class XYAnomalyHandler:
         
         return bands
     
-    def interpolate_band(self, x_series, y_series, start, end):
-        """Linearly interpolate over anomaly band."""
+    def interpolate_band(self, x_series, y_series, z_series, start, end):
+        """Linearly interpolate over anomaly band. returns floating point numbers"""
         x_series = x_series.copy()
         y_series = y_series.copy()
+        z_series = z_series.copy()
         
         # Ensure we have valid values to interpolate from
         if start == 0:
@@ -82,25 +83,30 @@ class XYAnomalyHandler:
             if end < len(x_series):
                 x_series.iloc[start:end] = x_series.iloc[end]
                 y_series.iloc[start:end] = y_series.iloc[end]
+                z_series.iloc[start:end] = z_series.iloc[end]
         elif end >= len(x_series):
             # Band at end, use last valid value
             x_series.iloc[start:end] = x_series.iloc[start - 1]
             y_series.iloc[start:end] = y_series.iloc[start - 1]
+            z_series.iloc[start:end] = z_series.iloc[start - 1]
         else:
             # Band in middle, interpolate between valid values
             x_before = x_series.iloc[start - 1]
             x_after = x_series.iloc[end]
             y_before = y_series.iloc[start - 1]
             y_after = y_series.iloc[end]
+            z_before = z_series.iloc[start - 1]
+            z_after = z_series.iloc[end]
             
-            steps = np.arange(end - start + 1) / (end - start)
-            x_interp = x_before + steps[:-1] * (x_after - x_before)
-            y_interp = y_before + steps[:-1] * (y_after - y_before)
+            x_interp = np.linspace(x_before, x_after, end - start + 2)[1:-1]
+            y_interp = np.linspace(y_before, y_after, end - start + 2)[1:-1]
+            z_interp = np.linspace(z_before, z_after, end - start + 2)[1:-1]
             
             x_series.iloc[start:end] = x_interp
             y_series.iloc[start:end] = y_interp
+            z_series.iloc[start:end] = z_interp
         
-        return x_series, y_series
+        return x_series, y_series, z_series
     
     def process_segment(self, seg_df, seg_id, match_id):
         """
@@ -112,7 +118,7 @@ class XYAnomalyHandler:
         seg_df = seg_df.copy().reset_index(drop=True)
         
         # Find anomaly bands
-        bands = self.find_anomaly_bands(seg_df['shuttle_x'], seg_df['shuttle_y'])
+        bands = self.find_anomaly_bands(seg_df['shuttle_x'], seg_df['shuttle_y'], seg_df['shuttle_z'])
         
         if not bands:
             # No anomalies
@@ -122,8 +128,8 @@ class XYAnomalyHandler:
         for start, end, size in reversed(bands):
             if size <= self.interp_threshold:
                 # Interpolate
-                seg_df['shuttle_x'], seg_df['shuttle_y'] = self.interpolate_band(
-                    seg_df['shuttle_x'], seg_df['shuttle_y'], start, end
+                seg_df['shuttle_x'], seg_df['shuttle_y'], seg_df['shuttle_z'] = self.interpolate_band(
+                    seg_df['shuttle_x'], seg_df['shuttle_y'], seg_df['shuttle_z'], start, end
                 )
                 self.stats['anomalies_interpolated'] += 1
                 self.stats['frames_interpolated'] += size
@@ -137,12 +143,15 @@ class XYAnomalyHandler:
                 self.stats['frames_masked'] += size
             
             else:
-                # Split segment (large gap)
+                # FIXME: Split segment (large gap)
                 # Will handle in main loop after all band processing
                 pass
         
+        # FIXME: you are checking for bands twice; once in the loop to handle smaller bands and once here for larger
+        # ones. Implement a better method
+
         # Check if any large bands remain (these need segment splitting)
-        final_bands = self.find_anomaly_bands(seg_df['shuttle_x'], seg_df['shuttle_y'])
+        final_bands = self.find_anomaly_bands(seg_df['shuttle_x'], seg_df['shuttle_y'], seg_df['shuttle_z'])
         large_bands = [b for b in final_bands if b[2] > self.mask_threshold]
         
         if large_bands:
@@ -167,11 +176,20 @@ class XYAnomalyHandler:
             
             # Renumber segment IDs for split segments
             for i, seg in enumerate(segments_split):
+                seg = seg.astype({'segment_idx': object})
                 seg.loc[:,'segment_idx'] = f"{seg_id}_split{i}"
+                segments_split[i] = seg
             
+            # ? is this stat for new segments created calculated correctly?
             self.stats['segments_created'] += len(segments_split)
+            
+            # ? Is this return format correct?
+            # * yes, segements_split is a list of dataframes that was created if there are larger bands that need to be broken
             return segments_split
         
+        # * here, seg_df is a df for a single segment that has been processed according to anomalous bands inside it
+        # * since no large bands were found, no new segments were created
+        # * hence, the function here returns a list containing the single processed segment
         return [seg_df]
     
     def process_dataframe(self, df):
@@ -182,22 +200,38 @@ class XYAnomalyHandler:
             Cleaned dataframe with NaN-masked anomalies
         """
         results = []
+        mapping = {}
         
         for match_id in df['match_id'].unique():
             match_df = df[df['match_id'] == match_id]
+            seg_counter = 1
+            if hasattr(match_id, 'item'):
+                match_id = match_id.item()
+            mapping[match_id] = {}
             
             for seg_id in match_df['segment_idx'].unique():
                 seg_df = match_df[match_df['segment_idx'] == seg_id]
                 
                 # Process segment
                 seg_results = self.process_segment(seg_df, seg_id, match_id)
-                results.extend(seg_results)
+
+                for result in seg_results:
+                    curr_id = result["segment_idx"].iloc[0]
+                    if hasattr(curr_id, 'item'):
+                        curr_id = curr_id.item()
+                    mapping[match_id][curr_id] = seg_counter
+                    result["segment_idx"] = seg_counter
+                    seg_counter += 1
+                    results.append(result)
+                
                 
                 self.stats['segments_processed'] += 1
         
         # Concatenate all results
+        with open(self.path_resolver.get_path("tranSPORTmer.data.segment_mapping_json"), "w") as f:
+            json.dump(mapping, f)
+
         df_cleaned = pd.concat(results, ignore_index=True)
-        
         return df_cleaned, self.stats
 
 

@@ -34,3 +34,5 @@ shot_types.pkl
 
 # graphify files
 graphify-out/
+
+*.egg-info/

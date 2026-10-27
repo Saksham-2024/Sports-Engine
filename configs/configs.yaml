@@ -61,6 +61,7 @@ tranSPORTmer:
     normalized_csv: "outputs/transformer_dataset_normalized.csv"
     training_data_dir: "outputs/training_data"
     normalization_stats: "outputs/normalization_stats.json"
+    segment_mapping_json: "outputs/segment_mapping.json"
   weights:
     best_weights: "models/best_TranSPORTmer_weights.pth"
 
