@@ -7,3 +7,4 @@
 7. ensure solid design principles
 8. in the calieration pipeline classs inside run method, we check for if video doesnt have homography adn then get points and then if it doesnt have camera pos, we again ask users to click on points. this is redundant and frustrating. fix this (camera_matrice.py)
 9. keep in mind that default start frame in case no segments are available before homography/camera_pos calculation is 7500 - according to BWF videos. actual videos from real users may be short and we might kip through the entire video or most of 
+10. Verify test_physics.py and test_verify_coords.py to ensure mock data is of good quality and all cases are being covered.

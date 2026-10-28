@@ -123,7 +123,7 @@ class Executer:
         
         consolidated_shuttle_dfs = []
         for seg_idx, (seg_start, seg_end) in enumerate(segments):
-            shuttle_path_for_segment = os.path.join(match_shuttle_dir, f"segment{seg_idx + 1}_ball.csv")
+            shuttle_path_for_segment = os.path.join(match_shuttle_dir, f"segment{seg_idx + 1}", f"{match}_ball.csv")
             if not os.path.exists(shuttle_path_for_segment):
                 self.logger.warning(f"No shuttle CSV for segment {seg_idx + 1} in {match}")
                 continue
